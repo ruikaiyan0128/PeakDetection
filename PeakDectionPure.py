@@ -20,7 +20,7 @@ algorism:
 '''
 
 
-def detect_peaks(x, mh, threshold, show=False, ax=None):
+def detect_peaks(x, mh, threshold, amplitude=False, show=False, ax=None):
     import numpy as np
 
     # convert to numpy array
@@ -146,10 +146,13 @@ def detect_peaks(x, mh, threshold, show=False, ax=None):
     # convert to an array
     peak_ind = sorted(peak_ind)
     peak_ind = np.array(peak_ind)
+    amp = [x[i] for i in set(peak_ind)]
     # print(peak_ind)
     if show:
         _plot(x, ax, peak_ind)
     return peak_ind
+    if amplitude:
+        return amp
 
 
 def _plot(x, ax, peak_ind):
