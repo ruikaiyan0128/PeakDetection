@@ -13,7 +13,7 @@ from PeakDectionPure import *
 # use "numdays" days of data each day, and "numdays" days
 numdays = 50
 # this is the start date, usually today
-start_date = datetime.date(2016, 1, 28)
+start_date = datetime.date(2016, 2, 1)
 # create the plot axis which contains all dates from "numdays" ago to 61 days later
 longxaxis = sorted([start_date - datetime.timedelta(days=x) for x in range(0, numdays)] +
                    [start_date + datetime.timedelta(days=x) for x in range(0, 61)])
@@ -100,13 +100,12 @@ for dt in range(numdays):
     # store peak indices into dictonary "peak", and peak dates to list "peak_date"
     peak = {}
     peak_date = []
-    amplitude = {}
 
     # do peak detection for all days
     for i in range(numdays):
         # detect indices of peaks for the data from the day (date_list[i]) and store to dictonary peak
-        peak[date_list[i]], amplitude[date_list[i]] = \
-            detect_peaks(data[date_list[i]], mh=0, threshold=1.2e9, amplitude=True, show=False)
+        peak[date_list[i]] = \
+            detect_peaks(data[date_list[i]], mh=0, threshold=1.2e9, amplitude=False, show=False)
         # convert the peak indices to actual dates
         for j in range(len(peak[date_list[i]])):
             peak_date.append(date_list[i] +
@@ -136,7 +135,6 @@ for dt in range(numdays):
 #            print('peak at {0}, with a probability of {1:6.2f}, {2:6.2f}, {3:6.2f} %'
 #                  .format(c[i][0], c[i][1], td[c[i][0]], fd[c[i][0]]))
 
-
         for i in range(len(longxaxis)):
             for j in range(len(c)):
                 if c[j][0] > base:
@@ -147,11 +145,19 @@ for dt in range(numdays):
             yaxis2[i] = yaxis1[i-1] + yaxis1[i] + yaxis1[i+1]
             yaxis3[i] = yaxis1[i-2] + yaxis1[i-1] + yaxis1[i] + yaxis1[i+1] + yaxis1[i+2]
 
+        yaxis2[0] = yaxis1[0]
+        yaxis3[0] = yaxis1[0]
+        yaxis2[1] = yaxis1[1]
+        yaxis3[1] = yaxis1[1]
+
         plotdata1[dt, :] = yaxis1
         plotdata2[dt, :] = yaxis2
         plotdata3[dt, :] = yaxis3
 
 # do contour plot
+
+font = {'weight': 'bold', 'size': 15}
+plt.rc('font', **font)
 
 nx, ny = np.shape(plotdata1)
 fig = plt.figure(figsize=(30, 15))
@@ -160,12 +166,14 @@ ax.set_xticks(np.arange(0, 112, 10))
 ax.set_yticks(np.arange(0, 51, 10))
 ax.set_xticks(np.arange(0, 112, 1), minor=True)
 ax.set_yticks(np.arange(0, 51, 1), minor=True)
-
-cmap = plt.cm.get_cmap('bwr')
-cs = plt.pcolor(plotdata1, cmap=cmap)
+# color map and set 0 to white
+cmap = plt.cm.get_cmap('jet')
+cmap.set_under('white')
+##########
+cs = plt.pcolor(np.ma.masked_values(plotdata1, 0), vmin=np.spacing(0.0), cmap=cmap)
 cb = plt.colorbar(cs)
-#pylab.xticks(range(0, len(longxaxis)), longxaxis)
-#pylab.yticks(range(0, numdays), [start_date - datetime.timedelta(days=x) for x in range(0, numdays)])
+ax.set_xticklabels(longxaxis[::10])
+ax.xaxis.set_tick_params(labeltop='on')
 plt.gca().invert_yaxis()
 plt.gca().set_xlim([0, len(longxaxis)])
 plt.savefig('./single_day.eps')
@@ -176,11 +184,13 @@ ax.set_xticks(np.arange(0, 112, 10))
 ax.set_yticks(np.arange(0, 51, 10))
 ax.set_xticks(np.arange(0, 112, 1), minor=True)
 ax.set_yticks(np.arange(0, 51, 1), minor=True)
-cs = plt.pcolor(plotdata2, cmap=cmap)
+cs = plt.pcolor(np.ma.masked_values(plotdata2, 0), vmin=np.spacing(0.0), cmap=cmap)
 cb = plt.colorbar(cs)
+ax.set_xticklabels(longxaxis[::10])
+ax.xaxis.set_tick_params(labeltop='on')
 plt.gca().invert_yaxis()
 plt.gca().set_xlim([0, len(longxaxis)])
-plt.savefig('./three_day_window.eps')
+plt.savefig('./three_day.eps')
 
 fig = plt.figure(figsize=(30, 15))
 ax = fig.add_subplot(1, 1, 1)
@@ -188,8 +198,10 @@ ax.set_xticks(np.arange(0, 112, 10))
 ax.set_yticks(np.arange(0, 51, 10))
 ax.set_xticks(np.arange(0, 112, 1), minor=True)
 ax.set_yticks(np.arange(0, 51, 1), minor=True)
-cs = plt.pcolor(plotdata3, cmap=cmap)
+cs = plt.pcolor(np.ma.masked_values(plotdata3, 0), vmin=np.spacing(0.0), cmap=cmap)
 cb = plt.colorbar(cs)
+ax.set_xticklabels(longxaxis[::10])
+ax.xaxis.set_tick_params(labeltop='on')
 plt.gca().invert_yaxis()
 plt.gca().set_xlim([0, len(longxaxis)])
-plt.savefig('./five_day_window.eps')
+plt.savefig('./five_day.eps')

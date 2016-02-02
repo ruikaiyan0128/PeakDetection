@@ -13,7 +13,7 @@ from PeakDectionPure import *
 # use "numdays" days of data each day, and "numdays" days
 numdays = 50
 # this is the start date, usually today
-start_date = datetime.date(2016, 1, 28)
+start_date = datetime.date(2016, 2, 1)
 # create the plot axis which contains all dates from "numdays" ago to 61 days later
 longxaxis = sorted([start_date - datetime.timedelta(days=x) for x in range(0, numdays)] +
                    [start_date + datetime.timedelta(days=x) for x in range(0, 61)])
@@ -178,6 +178,8 @@ for dt in range(numdays):
 
 # do contour plot
 
+font = {'weight': 'bold', 'size': 15}
+plt.rc('font', **font)
 
 nx, ny = np.shape(plotdata1)
 fig = plt.figure(figsize=(30, 15))
@@ -187,14 +189,16 @@ ax.set_yticks(np.arange(0, 51, 10))
 ax.set_xticks(np.arange(0, 112, 1), minor=True)
 ax.set_yticks(np.arange(0, 51, 1), minor=True)
 
-cmap = plt.cm.get_cmap('bwr')
-cs = plt.pcolor(plotdata1, cmap=cmap)
+cmap = plt.cm.get_cmap('jet')
+cmap.set_under('white')
+cs = plt.pcolor(np.ma.masked_values(plotdata1, 0), vmin=np.spacing(0.0), cmap=cmap)
 cb = plt.colorbar(cs)
-#pylab.xticks(range(0, len(longxaxis)), longxaxis)
-#pylab.yticks(range(0, numdays), [start_date - datetime.timedelta(days=x) for x in range(0, numdays)])
+
+ax.set_xticklabels(longxaxis[::10])
+ax.xaxis.set_tick_params(labeltop='on')
 plt.gca().invert_yaxis()
 plt.gca().set_xlim([0, len(longxaxis)])
-plt.savefig('./single_day.eps')
+plt.savefig('./single_day_window.eps')
 
 fig = plt.figure(figsize=(30, 15))
 ax = fig.add_subplot(1, 1, 1)
@@ -202,8 +206,10 @@ ax.set_xticks(np.arange(0, 112, 10))
 ax.set_yticks(np.arange(0, 51, 10))
 ax.set_xticks(np.arange(0, 112, 1), minor=True)
 ax.set_yticks(np.arange(0, 51, 1), minor=True)
-cs = plt.pcolor(plotdata2, cmap=cmap)
+cs = plt.pcolor(np.ma.masked_values(plotdata2, 0), vmin=np.spacing(0.0), cmap=cmap)
 cb = plt.colorbar(cs)
+ax.set_xticklabels(longxaxis[::10])
+ax.xaxis.set_tick_params(labeltop='on')
 plt.gca().invert_yaxis()
 plt.gca().set_xlim([0, len(longxaxis)])
 plt.savefig('./three_day_window.eps')
@@ -214,8 +220,10 @@ ax.set_xticks(np.arange(0, 112, 10))
 ax.set_yticks(np.arange(0, 51, 10))
 ax.set_xticks(np.arange(0, 112, 1), minor=True)
 ax.set_yticks(np.arange(0, 51, 1), minor=True)
-cs = plt.pcolor(plotdata3, cmap=cmap)
+cs = plt.pcolor(np.ma.masked_values(plotdata3, 0), vmin=np.spacing(0.0), cmap=cmap)
 cb = plt.colorbar(cs)
+ax.set_xticklabels(longxaxis[::10])
+ax.xaxis.set_tick_params(labeltop='on')
 plt.gca().invert_yaxis()
 plt.gca().set_xlim([0, len(longxaxis)])
 plt.savefig('./five_day_window.eps')
