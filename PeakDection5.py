@@ -6,14 +6,13 @@ import datetime
 import matplotlib.pyplot as plt
 import matplotlib.pylab as pylab
 from PeakDectionPure import *
-
-
-
+import scipy.stats
+from collections import Counter
 
 # use "numdays" days of data each day, and "numdays" days
-numdays = 50
+numdays = 3
 # this is the start date, usually today
-start_date = datetime.date(2016, 2, 2)
+start_date = datetime.date(2016, 2, 1)
 # create the plot axis which contains all dates from "numdays" ago to 61 days later
 longxaxis = sorted([start_date - datetime.timedelta(days=x) for x in range(0, numdays)] +
                    [start_date + datetime.timedelta(days=x) for x in range(0, 61)])
@@ -31,7 +30,7 @@ for dt in range(numdays):
     # the xaxis of the plot, which is from today to the last day of data (61 days later)
     xaxis = [base + datetime.timedelta(days=x) for x in range(0, 61)]
     # the whole time period from the first available data date to the last date
-    total_time = sorted(date_list[:-1] + xaxis[1:])
+    total_time = sorted(date_list[:-1] + xaxis)
 
     # produce the date string and convert to integer
     date_int = []
@@ -95,11 +94,20 @@ for dt in range(numdays):
     # do three-day running mean
     for i in range(numdays):
         data[date_list[i]] = pd.rolling_mean(datave[i], window=5, center=True)
-
+        data[date_list[i]][0] = datave[i][0]
+        data[date_list[i]][1] = datave[i][1]
+        data[date_list[i]][-2] = datave[i][-2]
+        data[date_list[i]][-1] = datave[i][-1]
     # do peak detection for all keys in the dictionary
     # store peak indices into dictonary "peak", and peak dates to list "peak_date"
     peak = {}
     peak_date = []
+    amp = []
+    p_amplitude = []
+    p_Amplitude = {}
+    p_Amplitude_sort = {}
+    amplitude = []
+    Amplitude = {}
 
     # three day window and five day window
     # create dictionary
@@ -114,12 +122,16 @@ for dt in range(numdays):
     # do peak detection for all days
     for i in range(numdays):
         # detect indices of peaks for the data from the day (date_list[i]) and store to dictonary peak
-        peak[date_list[i]] = detect_peaks(data[date_list[i]], mh=0, threshold=1.2e9, show=False)
+        peak[date_list[i]], amp \
+            = detect_peaks(data[date_list[i]], mh=0, threshold=1.2e9, amplitude=True, show=False)
         # convert the peak indices to actual dates
         for j in range(len(peak[date_list[i]])):
             peak_date.append(date_list[i] +
                              datetime.timedelta(np.int(peak[date_list[i]][j])))
-
+            p_amplitude.append([date_list[i] +
+                             datetime.timedelta(np.int(peak[date_list[i]][j])), amp[j]])
+        for j in range(61):
+            amplitude.append([date_list[i] + datetime.timedelta(j), data[date_list[i]][j]])
     # count peak times for three days and five days windows
     for i in range(len(peak_date)):
         # The first one cannot be valid
@@ -128,7 +140,7 @@ for dt in range(numdays):
             td[peak_date[i] - datetime.timedelta(1)] = td[peak_date[i] - datetime.timedelta(1)] + 1
             td[peak_date[i] + datetime.timedelta(1)] = td[peak_date[i] + datetime.timedelta(1)] + 1
         # The first and the second ones cannot be valid
-        if peak_date[i] > total_time[2]:
+        if peak_date[i] > total_time[2] and peak_date[i] < total_time[-2]:
             fd[peak_date[i]] = fd[peak_date[i]] + 1
             fd[peak_date[i] - datetime.timedelta(1)] = fd[peak_date[i] - datetime.timedelta(1)] + 1
             fd[peak_date[i] - datetime.timedelta(2)] = fd[peak_date[i] - datetime.timedelta(2)] + 1
@@ -137,12 +149,36 @@ for dt in range(numdays):
 
     # Count times and calculate possibilities of peak dates' appearance
     c = sorted([[x, peak_date.count(x)] for x in set(peak_date)])
+    # for peak days
+    for i in range(len(p_amplitude)):
+        s = 0
+        for j in range(len(c)):
+            if p_amplitude[i][0] == c[j][0]:
+                s = s + p_amplitude[i][1]
+                p_Amplitude[c[j][0]] = s
+    # calculate average
+    for k in p_Amplitude.keys():
+        for j in range(len(c)):
+            if c[j][0] == k:
+                p_Amplitude[k] = p_Amplitude[k] / c[j][1]
+    # sort the dictonary
+    for key in sorted(p_Amplitude):
+        p_Amplitude_sort[key] = p_Amplitude[key]
+    # for all days
+    for i in range(len(total_time)):
+        s = 0
+        for j in range(len(amplitude)):
+            if amplitude[j][0] == total_time[i]:
+                s = s + amplitude[j][1]
+                Amplitude[total_time[i]] = s
 
     # Prepare the possibility arrays matches the longxaxis
     yaxis1 = np.zeros(len(longxaxis))
     yaxis2 = np.zeros(len(longxaxis))
     yaxis3 = np.zeros(len(longxaxis))
 
+    amplitude_t = []
+    p_amplitude_t = []
     # calculate probability
     for i in range(len(c)):
         # we only interested in dates after base date, which is usually today
@@ -151,7 +187,8 @@ for dt in range(numdays):
             c[i][1] = c[i][1] * 100. / numdays
             td[c[i][0]] = td[c[i][0]] * 100. / numdays
             fd[c[i][0]] = fd[c[i][0]] * 100. / numdays
-
+            amplitude_t.append(Amplitude[c[i][0]] / numdays)
+            p_amplitude_t.append(p_Amplitude_sort[c[i][0]])
 #            print('peak at {0}, with a probability of {1:6.2f}, {2:6.2f}, {3:6.2f} %'
 #                  .format(c[i][0], c[i][1], td[c[i][0]], fd[c[i][0]]))
 
@@ -160,9 +197,10 @@ for dt in range(numdays):
             c[i][1] = c[i][1] * 100. / (numdays - ((c[i][0] - base).days - (61 - numdays)))
             td[c[i][0]] = td[c[i][0]] * 100. / (numdays - ((c[i][0] - base).days - (61 - numdays)))
             fd[c[i][0]] = fd[c[i][0]] * 100. / (numdays - ((c[i][0] - base).days - (61 - numdays)))
+            amplitude_t.append(Amplitude[c[i][0]] / (numdays - ((c[i][0] - base).days - (61 - numdays))))
+            p_amplitude_t.append(p_Amplitude_sort[c[i][0]])
 #            print('peak at {0}, with a probability of {1:6.2f}, {2:6.2f}, {3:6.2f} %'
 #                  .format(c[i][0], c[i][1], td[c[i][0]], fd[c[i][0]]))
-
 
         for i in range(len(longxaxis)):
             for j in range(len(c)):
@@ -175,6 +213,13 @@ for dt in range(numdays):
         plotdata1[dt, :] = yaxis1
         plotdata2[dt, :] = yaxis2
         plotdata3[dt, :] = yaxis3
+
+    # do t test for each base date
+    #pvalue = 1
+    pvalue = scipy.stats.ttest_rel(p_amplitude_t, amplitude_t)
+    print(p_amplitude_t)
+    print(amplitude_t)
+    print(pvalue)
 
 # do contour plot
 

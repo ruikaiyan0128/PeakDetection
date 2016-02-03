@@ -150,9 +150,11 @@ def detect_peaks(x, mh, threshold, amplitude=False, show=False, ax=None):
     # print(peak_ind)
     if show:
         _plot(x, ax, peak_ind)
-    return peak_ind
+
     if amplitude:
-        return amp
+        return (peak_ind, amp)
+    else:
+        return peak_ind
 
 
 def _plot(x, ax, peak_ind):
