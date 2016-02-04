@@ -14,12 +14,12 @@ import datetime
 import matplotlib.pyplot as plt
 import matplotlib.pylab as pylab
 from PeakDectionPure import *
-import scipy.stats
+import scipy.stats as sp
 import math
 # use "numdays" days of data each day, and "numdays" days
 numdays = 50
 # this is the start date, usually today
-start_date = datetime.date(2016, 2, 2)
+start_date = datetime.date(2016, 2, 3)
 # create the plot axis which contains all dates from "numdays" ago to 61 days later
 longxaxis = sorted([start_date - datetime.timedelta(days=x) for x in range(0, numdays)] +
                    [start_date + datetime.timedelta(days=x) for x in range(1, 61)])
@@ -31,6 +31,14 @@ plotdata_ave = np.zeros(shape=(numdays, len(longxaxis)), dtype=np.float)
 plotdata_peak_ave1 = np.zeros(shape=(numdays, len(longxaxis)), dtype=np.float)
 plotdata_peak_ave3 = np.zeros(shape=(numdays, len(longxaxis)), dtype=np.float)
 plotdata_peak_ave5 = np.zeros(shape=(numdays, len(longxaxis)), dtype=np.float)
+pvalue1 = np.ones(shape=(numdays, len(longxaxis)), dtype=np.float)
+pvalue3 = np.ones(shape=(numdays, len(longxaxis)), dtype=np.float)
+pvalue5 = np.ones(shape=(numdays, len(longxaxis)), dtype=np.float)
+
+#create date label
+longxaxislabel = [None] * len(longxaxis)
+for i in range(len(longxaxis)):
+    longxaxislabel[i] = str(longxaxis[i].month) + '/' + str(longxaxis[i].day)
 
 # loop through numdays
 for dt in range(numdays):
@@ -154,46 +162,63 @@ for dt in range(numdays):
     for j in range(numdays - 1, len(total_time)):
         s = 0
         c = 0
+        a = []
+        b = []
+        # store all day average amplitude
+        amplitude_ave[j] = sum(amplitude[:, j])/np.count_nonzero(amplitude[:, j])
         # single day's peak probability and average
         for i in range(numdays):
+            b.append(amplitude[i, j])
             if peak[i, j] == 1:
                 s = s + amplitude[i, j]
                 c = c + 1
+                a.append(amplitude[i, j])
         # store probability
         if np.count_nonzero(amplitude[:, j]) != 0:
             yaxis1[j] = c / np.count_nonzero(amplitude[:, j])
         # store peak day average amplitude
         if c != 0:
             peak_amplitude_ave1[j] = s / c
+        # do t test and store p value to an array
+        if np.isnan(sp.ttest_ind(a, b)[1]) == False:
+            pvalue1[dt, j-dt] = sp.ttest_ind(a, b)[1]
         # three day
         s = 0
         c = 0
+        a = []
         for i in range(numdays):
             if peak3[i, j] >= 1:
                 s = s + amplitude[i, j]
                 c = c + 1
+                a.append(amplitude[i, j])
         # store probability
         if np.count_nonzero(amplitude[:, j]) != 0:
             yaxis3[j] = c / np.count_nonzero(amplitude[:, j])
         # store peak day average amplitude
         if c != 0:
             peak_amplitude_ave3[j] = s / c
+        # do t test and store p value to an array
+        if np.isnan(sp.ttest_ind(a, b)[1]) == False:
+            pvalue3[dt, j-dt] = sp.ttest_ind(a, b)[1]
+
         # five day
         s = 0
         c = 0
+        a = []
         for i in range(numdays):
             if peak5[i, j] >= 1:
                 s = s + amplitude[i, j]
                 c = c + 1
+                a.append(amplitude[i, j])
         # store probability
         if np.count_nonzero(amplitude[:, j]) != 0:
             yaxis5[j] = c / np.count_nonzero(amplitude[:, j])
         # store peak day average amplitude
         if c != 0:
             peak_amplitude_ave5[j] = s / c
-
-        # store all day average amplitude
-        amplitude_ave[j] = sum(amplitude[:, j])/np.count_nonzero(amplitude[:, j])
+        # do t test and store p value to an array
+        if np.isnan(sp.ttest_ind(a, b)[1]) == False:
+            pvalue5[dt, j-dt] = sp.ttest_ind(a, b)[1]
 
     # all data starts from base day, store peak probability, and amplitude
     plotdata1[dt, numdays-1-dt: numdays-1-dt+60] = yaxis1[numdays:] * 100
@@ -205,18 +230,7 @@ for dt in range(numdays):
     plotdata_peak_ave3[dt, numdays - 1 - dt: numdays - 1 + 60 - dt] = peak_amplitude_ave3[numdays:]
     plotdata_peak_ave5[dt, numdays - 1 - dt: numdays - 1 + 60 - dt] = peak_amplitude_ave5[numdays:]
 
-    # do t test for each base date
-
-    a = []
-    b = []
-    for i in range(len(peak_amplitude_ave3)):
-        if not math.isnan(peak_amplitude_ave3[i]):
-            a.append(peak_amplitude_ave3[i])
-            b.append(amplitude_ave[i])
-
-    pvalue = scipy.stats.ttest_rel(a, b)[1]
-    print(pvalue)
-
+#print(pvalue3[10, :])
 # do contour plot
 
 font = {'weight': 'bold', 'size': 15}
@@ -225,8 +239,8 @@ plt.rc('font', **font)
 nx, ny = np.shape(plotdata1)
 fig = plt.figure(figsize=(30, 15))
 ax = fig.add_subplot(1, 1, 1)
-ax.set_xticks(np.arange(0, 112, 10))
-ax.set_yticks(np.arange(0, 51, 10))
+ax.set_xticks(np.arange(0, 112, 7))
+ax.set_yticks(np.arange(0, 51, 7))
 ax.set_xticks(np.arange(0, 112, 1), minor=True)
 ax.set_yticks(np.arange(0, 51, 1), minor=True)
 
@@ -235,92 +249,145 @@ cmap.set_under('white')
 cs = plt.pcolor(np.ma.masked_values(plotdata1, 0), vmin=np.spacing(0.0), cmap=cmap)
 cb = plt.colorbar(cs)
 
-ax.set_xticklabels(longxaxis[::10])
-ax.xaxis.set_tick_params(labeltop='on')
+ax.set_xticklabels(longxaxislabel[::7])
+ax.xaxis.set_tick_params(labeltop='on', length=10, width=2, which='major')
+ax.xaxis.set_tick_params(length=5, width=1, which='minor')
+ax.set_yticklabels(longxaxislabel[numdays-1::-7])
+ax.yaxis.set_tick_params(length=10, width=2, which='major')
+ax.yaxis.set_tick_params(length=5, width=1, which='minor')
+ax.grid(True, linewidth=2)
 plt.gca().invert_yaxis()
 plt.gca().set_xlim([0, len(longxaxis)])
 plt.savefig('./single_day_window_new.eps')
 
 fig = plt.figure(figsize=(30, 15))
 ax = fig.add_subplot(1, 1, 1)
-ax.set_xticks(np.arange(0, 112, 10))
-ax.set_yticks(np.arange(0, 51, 10))
+ax.set_xticks(np.arange(0, 112, 7))
+ax.set_yticks(np.arange(0, 51, 7))
 ax.set_xticks(np.arange(0, 112, 1), minor=True)
 ax.set_yticks(np.arange(0, 51, 1), minor=True)
 cs = plt.pcolor(np.ma.masked_values(plotdata3, 0), vmin=np.spacing(0.0), cmap=cmap)
 cb = plt.colorbar(cs)
-ax.set_xticklabels(longxaxis[::10])
-ax.xaxis.set_tick_params(labeltop='on')
+ax.set_xticklabels(longxaxislabel[::7])
+ax.xaxis.set_tick_params(labeltop='on', length=10, width=2, which='major')
+ax.xaxis.set_tick_params(length=5, width=1, which='minor')
+ax.set_yticklabels(longxaxislabel[numdays-1::-7])
+ax.yaxis.set_tick_params(length=10, width=2, which='major')
+ax.yaxis.set_tick_params(length=5, width=1, which='minor')
+ax.grid(True, linewidth=2)
 plt.gca().invert_yaxis()
 plt.gca().set_xlim([0, len(longxaxis)])
 plt.savefig('./three_day_window_new.eps')
 
 fig = plt.figure(figsize=(30, 15))
 ax = fig.add_subplot(1, 1, 1)
-ax.set_xticks(np.arange(0, 112, 10))
-ax.set_yticks(np.arange(0, 51, 10))
+ax.set_xticks(np.arange(0, 112, 7))
+ax.set_yticks(np.arange(0, 51, 7))
 ax.set_xticks(np.arange(0, 112, 1), minor=True)
 ax.set_yticks(np.arange(0, 51, 1), minor=True)
 cs = plt.pcolor(np.ma.masked_values(plotdata5, 0), vmin=np.spacing(0.0), cmap=cmap)
 cb = plt.colorbar(cs)
-ax.set_xticklabels(longxaxis[::10])
-ax.xaxis.set_tick_params(labeltop='on')
+ax.set_xticklabels(longxaxislabel[::7])
+ax.xaxis.set_tick_params(labeltop='on', length=10, width=2, which='major')
+ax.xaxis.set_tick_params(length=5, width=1, which='minor')
+ax.set_yticklabels(longxaxislabel[numdays-1::-7])
+ax.yaxis.set_tick_params(length=10, width=2, which='major')
+ax.yaxis.set_tick_params(length=5, width=1, which='minor')
+ax.grid(True, linewidth=2)
 plt.gca().invert_yaxis()
 plt.gca().set_xlim([0, len(longxaxis)])
 plt.savefig('./five_day_window_new.eps')
 
 fig = plt.figure(figsize=(30, 15))
 ax = fig.add_subplot(1, 1, 1)
-ax.set_xticks(np.arange(0, 112, 10))
-ax.set_yticks(np.arange(0, 51, 10))
+ax.set_xticks(np.arange(0, 112, 7))
+ax.set_yticks(np.arange(0, 51, 7))
 ax.set_xticks(np.arange(0, 112, 1), minor=True)
 ax.set_yticks(np.arange(0, 51, 1), minor=True)
 cs = plt.pcolor(np.ma.masked_values(plotdata_ave, 0), vmin=np.spacing(0.0), cmap=cmap)
 cb = plt.colorbar(cs)
-ax.set_xticklabels(longxaxis[::10])
-ax.xaxis.set_tick_params(labeltop='on')
+ax.set_xticklabels(longxaxislabel[::7])
+ax.xaxis.set_tick_params(labeltop='on', length=10, width=2, which='major')
+ax.xaxis.set_tick_params(length=5, width=1, which='minor')
+ax.set_yticklabels(longxaxislabel[numdays-1::-7])
+ax.yaxis.set_tick_params(length=10, width=2, which='major')
+ax.yaxis.set_tick_params(length=5, width=1, which='minor')
+ax.grid(True, linewidth=2)
 plt.gca().invert_yaxis()
 plt.gca().set_xlim([0, len(longxaxis)])
 plt.savefig('./overall_amplitude.eps')
 
 fig = plt.figure(figsize=(30, 15))
 ax = fig.add_subplot(1, 1, 1)
-ax.set_xticks(np.arange(0, 112, 10))
-ax.set_yticks(np.arange(0, 51, 10))
+ax.set_xticks(np.arange(0, 112, 7))
+ax.set_yticks(np.arange(0, 51, 7))
 ax.set_xticks(np.arange(0, 112, 1), minor=True)
 ax.set_yticks(np.arange(0, 51, 1), minor=True)
 cs = plt.pcolor(np.ma.masked_values(plotdata_peak_ave1, 0), vmin=np.spacing(0.0), cmap=cmap)
 cb = plt.colorbar(cs)
-ax.set_xticklabels(longxaxis[::10])
-ax.xaxis.set_tick_params(labeltop='on')
+ax.set_xticklabels(longxaxislabel[::7])
+ax.xaxis.set_tick_params(labeltop='on', length=10, width=2, which='major')
+ax.xaxis.set_tick_params(length=5, width=1, which='minor')
+ax.set_yticklabels(longxaxislabel[numdays-1::-7])
+ax.yaxis.set_tick_params(length=10, width=2, which='major')
+ax.yaxis.set_tick_params(length=5, width=1, which='minor')
+ax.grid(True, linewidth=2)
 plt.gca().invert_yaxis()
 plt.gca().set_xlim([0, len(longxaxis)])
+plt.gca().set_ylim([0, numdays])
+for i in range(numdays):
+    for j in range(len(longxaxis)):
+        if pvalue1[i, j] < 0.05:
+            plt.scatter(x=[j], y=[i], c='black', s=20)
+plt.gca().invert_yaxis()
 plt.savefig('./single_day_peak_amplitude.eps')
 
 fig = plt.figure(figsize=(30, 15))
 ax = fig.add_subplot(1, 1, 1)
-ax.set_xticks(np.arange(0, 112, 10))
-ax.set_yticks(np.arange(0, 51, 10))
+ax.set_xticks(np.arange(0, 112, 7))
+ax.set_yticks(np.arange(0, 51, 7))
 ax.set_xticks(np.arange(0, 112, 1), minor=True)
 ax.set_yticks(np.arange(0, 51, 1), minor=True)
 cs = plt.pcolor(np.ma.masked_values(plotdata_peak_ave3, 0), vmin=np.spacing(0.0), cmap=cmap)
 cb = plt.colorbar(cs)
-ax.set_xticklabels(longxaxis[::10])
-ax.xaxis.set_tick_params(labeltop='on')
+ax.set_xticklabels(longxaxislabel[::7])
+ax.xaxis.set_tick_params(labeltop='on', length=10, width=2, which='major')
+ax.xaxis.set_tick_params(length=5, width=1, which='minor')
+ax.set_yticklabels(longxaxislabel[numdays-1::-7])
+ax.yaxis.set_tick_params(length=10, width=2, which='major')
+ax.yaxis.set_tick_params(length=5, width=1, which='minor')
+ax.grid(True, linewidth=2)
 plt.gca().invert_yaxis()
 plt.gca().set_xlim([0, len(longxaxis)])
+plt.gca().set_ylim([0, numdays])
+for i in range(numdays):
+    for j in range(len(longxaxis)):
+        if pvalue3[i, j] < 0.05:
+            plt.scatter(x=[j], y=[i], c='black', s=20)
+plt.gca().invert_yaxis()
 plt.savefig('./three_day_peak_amplitude.eps')
 
 fig = plt.figure(figsize=(30, 15))
 ax = fig.add_subplot(1, 1, 1)
-ax.set_xticks(np.arange(0, 112, 10))
-ax.set_yticks(np.arange(0, 51, 10))
+ax.set_xticks(np.arange(0, 112, 7))
+ax.set_yticks(np.arange(0, 51, 7))
 ax.set_xticks(np.arange(0, 112, 1), minor=True)
 ax.set_yticks(np.arange(0, 51, 1), minor=True)
 cs = plt.pcolor(np.ma.masked_values(plotdata_peak_ave5, 0), vmin=np.spacing(0.0), cmap=cmap)
 cb = plt.colorbar(cs)
-ax.set_xticklabels(longxaxis[::10])
-ax.xaxis.set_tick_params(labeltop='on')
+ax.set_xticklabels(longxaxislabel[::7])
+ax.xaxis.set_tick_params(labeltop='on', length=10, width=2, which='major')
+ax.xaxis.set_tick_params(length=5, width=1, which='minor')
+ax.set_yticklabels(longxaxislabel[numdays-1::-7])
+ax.yaxis.set_tick_params(length=10, width=2, which='major')
+ax.yaxis.set_tick_params(length=5, width=1, which='minor')
+ax.grid(True, linewidth=2)
 plt.gca().invert_yaxis()
 plt.gca().set_xlim([0, len(longxaxis)])
+plt.gca().set_ylim([0, numdays])
+for i in range(numdays):
+    for j in range(len(longxaxis)):
+        if pvalue5[i, j] < 0.05:
+            plt.scatter(x=[j], y=[i], c='black', s=20)
+plt.gca().invert_yaxis()
 plt.savefig('./five_day_peak_amplitude.eps')
